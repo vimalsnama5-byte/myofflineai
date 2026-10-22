@@ -5,7 +5,7 @@ import '../services/assistant_controller.dart';
 import '../services/model_manager.dart';
 import 'setup_screen.dart';
 
-/// Model management + memory controls.
+/// Model management + memory + language controls.
 class SettingsScreen extends StatefulWidget {
   final AssistantController controller;
   const SettingsScreen({super.key, required this.controller});
@@ -16,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   Map<ModelKind, String> _sel = {};
+  final Map<String, bool> _installed = {};
 
   @override
   void initState() {
@@ -25,15 +26,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _load() async {
     _sel = await ModelManager.instance.selection();
+    for (final kind in ModelKind.values) {
+      for (final spec in specsFor(kind)) {
+        _installed[spec.id] =
+            await ModelManager.instance.isInstalled(spec);
+      }
+    }
     if (mounted) setState(() {});
   }
 
   String _kindLabel(ModelKind k) => switch (k) {
         ModelKind.llm => 'AI brain',
-        ModelKind.stt => 'Speech recognition',
-        ModelKind.tts => 'Voice',
+        ModelKind.stt => 'Speech recognition (STT)',
+        ModelKind.tts => 'Voice (TTS)',
         ModelKind.avatar => 'Avatar',
       };
+
+  Future<void> _selectSpec(ModelKind kind, String id) async {
+    if (_installed[id] != true) {
+      // Not downloaded yet — send them to the setup screen.
+      await ModelManager.instance.select(kind, id);
+      if (!mounted) return;
+      Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SetupScreen()));
+      return;
+    }
+    await ModelManager.instance.select(kind, id);
+    await _load();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Switched — restart the app to load the new model')));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,23 +65,52 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          for (final kind in ModelKind.values)
-            ListTile(
-              title: Text(_kindLabel(kind)),
-              subtitle: Text(_sel[kind] == null
-                  ? 'not installed'
-                  : specById(kind, _sel[kind]!).name),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete_outline),
-                onPressed: () async {
-                  final id = _sel[kind];
-                  if (id == null) return;
-                  await ModelManager.instance
-                      .delete(specById(kind, id));
-                  await _load();
-                },
-              ),
+          const Text('Assistant language',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          DropdownButton<String>(
+            value: widget.controller.language,
+            isExpanded: true,
+            items: const [
+              DropdownMenuItem(value: 'en', child: Text('English')),
+              DropdownMenuItem(value: 'ta', child: Text('தமிழ் (Tamil)')),
+            ],
+            onChanged: (v) async {
+              if (v != null) await widget.controller.setLanguage(v);
+              setState(() {});
+            },
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Tamil needs the multilingual Whisper model (STT) and a '
+            'Tamil Piper voice below.',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          const Divider(height: 32),
+          for (final kind in ModelKind.values) ...[
+            Text(_kindLabel(kind),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            DropdownButton<String>(
+              value: _sel[kind],
+              isExpanded: true,
+              items: [
+                for (final spec in specsFor(kind))
+                  DropdownMenuItem(
+                    value: spec.id,
+                    child: Text(
+                        '${spec.name}${_installed[spec.id] == true ? '' : '  (not downloaded)'}'),
+                  ),
+                if (kind == ModelKind.avatar &&
+                    _sel[kind] == kCustomAvatarSpec.id)
+                  DropdownMenuItem(
+                      value: kCustomAvatarSpec.id,
+                      child: const Text('Custom GLB')),
+              ],
+              onChanged: (v) {
+                if (v != null) _selectSpec(kind, v);
+              },
             ),
+            const SizedBox(height: 12),
+          ],
           const Divider(height: 32),
           ListTile(
             leading: const Icon(Icons.cleaning_services),

@@ -12,12 +12,17 @@ class LlmService {
 
   bool get isLoaded => _engine != null && _session != null;
 
-  static const _systemPrompt =
-      'You are Packet, a friendly on-device voice assistant. '
-      'Reply in one or two short spoken sentences. No markdown, no emoji, '
-      'no lists — plain conversational text only.';
+  static String _systemPromptFor(String language) => language == 'ta'
+      ? 'You are Packet, a friendly on-device voice assistant. '
+          'Always reply in Tamil (தமிழ்). '
+          'Reply in one or two short spoken sentences. No markdown, no emoji, '
+          'no lists — plain conversational text only.'
+      : 'You are Packet, a friendly on-device voice assistant. '
+          'Reply in one or two short spoken sentences. No markdown, no emoji, '
+          'no lists — plain conversational text only.';
 
-  Future<void> loadModel(Directory modelDir, String fileName) async {
+  Future<void> loadModel(Directory modelDir, String fileName,
+      {String language = 'en'}) async {
     final gguf = File('${modelDir.path}${Platform.pathSeparator}$fileName');
     if (!await gguf.exists()) {
       throw StateError('GGUF model not found: ${gguf.path}');
@@ -32,7 +37,7 @@ class LlmService {
         useMmap: true,
       ),
     );
-    _session = ChatSession(_engine!, systemPrompt: _systemPrompt);
+    _session = ChatSession(_engine!, systemPrompt: _systemPromptFor(language));
   }
 
   /// Restore persisted history into the session (roles user/assistant only).
@@ -51,6 +56,14 @@ class LlmService {
   }
 
   void clearHistory() => _session?.reset(keepSystemPrompt: true);
+
+  /// Swap the language mid-session without reloading the model.
+  void updateLanguage(String language) {
+    final session = _session;
+    if (session == null) return;
+    session.systemPrompt = _systemPromptFor(language);
+    session.reset(keepSystemPrompt: true);
+  }
 
   /// Streams the reply as text deltas.
   Stream<String> respond(String userText) async* {

@@ -28,6 +28,7 @@ class AvatarController {
     _viewer = viewer;
     final bytes = await File(glbPath).readAsBytes();
     _asset = await viewer.loadGltfFromBuffer(bytes);
+    await _asset!.transformToUnitCube();
     await _frameCamera();
     try {
       await _scanMorphs();
@@ -40,29 +41,15 @@ class AvatarController {
     _startBlinkLoop();
   }
 
-  /// Positions the camera to fit the model's real bounding box — reliable
-  /// regardless of glTF units or whether the root transform affects
-  /// skinned vertices.
+  /// After transformToUnitCube the asset fills a 1×1×1 box at the origin —
+  /// fixed camera just outside it works for every model.
   Future<void> _frameCamera() async {
-    final asset = _asset;
     final viewer = _viewer;
-    if (asset == null || viewer == null) return;
-    final box = await asset.getBoundingBox();
-    final size = vm.Vector3(
-      box.max.x - box.min.x,
-      box.max.y - box.min.y,
-      box.max.z - box.min.z,
-    );
-    final center = vm.Vector3(
-      (box.min.x + box.max.x) / 2,
-      (box.min.y + box.max.y) / 2,
-      (box.min.z + box.max.z) / 2,
-    );
-    final extent = max(size.x, max(size.y, size.z)).clamp(0.01, 1e6);
+    if (viewer == null) return;
     final camera = await viewer.getActiveCamera();
     await camera.lookAt(
-      center + vm.Vector3(0, extent * 0.1, extent * 1.6),
-      focus: center,
+      vm.Vector3(0, 0.1, 1.6),
+      focus: vm.Vector3(0, 0, 0),
     );
   }
 

@@ -55,6 +55,7 @@ class AssistantController extends ChangeNotifier {
   Future<void> init() async {
     try {
       await MemoryService.instance.init();
+      _language = await MemoryService.instance.getPref('language') ?? 'en';
       await _restoreTranscript();
 
       for (final kind in ModelKind.values) {
@@ -103,9 +104,13 @@ class AssistantController extends ChangeNotifier {
       micLevel = level;
       notifyListeners();
     };
-    await stt.loadModel(await _installDirFor(ModelKind.stt));
-    log('STT ready');
+    await stt.loadModel(await _installDirFor(ModelKind.stt),
+        language: _language);
+    log('STT ready (lang=$_language)');
   }
+
+  String _language = 'en';
+  String get language => _language;
 
   Future<void> _loadTts() async {
     log('Loading TTS');
@@ -117,7 +122,8 @@ class AssistantController extends ChangeNotifier {
     log('Loading LLM');
     final spec = (await ModelManager.instance.selectedSpec(ModelKind.llm))!;
     await llm.loadModel(
-        await _installDirFor(ModelKind.llm), spec.fileName);
+        await _installDirFor(ModelKind.llm), spec.fileName,
+        language: _language);
     final history = await MemoryService.instance.recentMessages(limit: 12);
     llm.seedHistory(
         history.map((m) => (m.role, m.text)).toList());
@@ -275,6 +281,24 @@ class AssistantController extends ChangeNotifier {
         notifyListeners();
       }
     }));
+  }
+
+  /// Switch assistant language ('en' or 'ta'). Rebuilds the recognizer
+  /// and the LLM system prompt; takes effect immediately.
+  Future<void> setLanguage(String code) async {
+    if (code == _language) return;
+    _language = code;
+    await MemoryService.instance.setPref('language', code);
+    log('Language -> $code');
+    llm.updateLanguage(code);
+    if (stt.isListening) await stt.cancel();
+    try {
+      await stt.loadModel(await _installDirFor(ModelKind.stt),
+          language: code);
+    } catch (e) {
+      log('STT reload failed: $e');
+    }
+    notifyListeners();
   }
 
   Future<void> clearMemory() async {

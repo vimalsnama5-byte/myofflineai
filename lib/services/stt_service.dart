@@ -31,7 +31,9 @@ class SttService {
   static const _silenceLimitMs = 1400;
   static const _sampleRate = 16000;
 
-  Future<void> loadModel(Directory modelDir) async {
+  /// [language] is an ISO code like 'en' or 'ta' for multilingual Whisper;
+  /// empty string lets Whisper auto-detect. Ignored by .en models.
+  Future<void> loadModel(Directory modelDir, {String language = 'en'}) async {
     final encoder = await ModelManager.instance
         .findFile(modelDir, r'encoder.*\.onnx$');
     final decoder = await ModelManager.instance
@@ -48,6 +50,7 @@ class SttService {
           whisper: sherpa.OfflineWhisperModelConfig(
             encoder: encoder.path,
             decoder: decoder.path,
+            language: language,
           ),
           tokens: tokens.path,
           numThreads: 2,

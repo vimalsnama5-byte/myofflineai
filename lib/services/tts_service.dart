@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
@@ -36,12 +37,19 @@ class TtsService {
   Future<void> loadModel(Directory modelDir) async {
     final model =
         await ModelManager.instance.findFile(modelDir, r'\.onnx$');
-    final tokens =
+    var tokens =
         await ModelManager.instance.findFile(modelDir, r'tokens\.txt$');
     final dataDir =
         await ModelManager.instance.findDir(modelDir, r'espeak');
-    if (model == null || tokens == null) {
+    if (model == null) {
       throw StateError('TTS model files missing in ${modelDir.path}');
+    }
+    // Community Piper voices ship no tokens.txt — synthesize it from the
+    // phoneme_id_map inside the model's .onnx.json (same mapping sherpa
+    // expects: one "<token> <id>" per line).
+    tokens ??= await _generateTokensFile(modelDir);
+    if (tokens == null) {
+      throw StateError('TTS tokens.txt missing and cannot be generated');
     }
     _tts = sherpa.OfflineTts(
       sherpa.OfflineTtsConfig(
@@ -111,6 +119,31 @@ class TtsService {
       _player.play(DeviceFileSource(result.wavPath));
 
   Future<void> stop() => _player.stop();
+
+  /// Builds a sherpa `tokens.txt` (`<token> <id>` per line) from the
+  /// `phoneme_id_map` inside the Piper model's `.onnx.json` sidecar.
+  Future<File?> _generateTokensFile(Directory modelDir) async {
+    final cfg =
+        await ModelManager.instance.findFile(modelDir, r'\.onnx\.json$');
+    if (cfg == null) return null;
+    try {
+      final json =
+          jsonDecode(await cfg.readAsString()) as Map<String, dynamic>;
+      final map = json['phoneme_id_map'] as Map<String, dynamic>?;
+      if (map == null || map.isEmpty) return null;
+      final buf = StringBuffer();
+      for (final entry in map.entries) {
+        final ids = entry.value;
+        final id = ids is List ? ids.first : ids;
+        buf.writeln('${entry.key} $id');
+      }
+      final out = File('${modelDir.path}${Platform.pathSeparator}tokens.txt');
+      await out.writeAsString(buf.toString());
+      return out;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> dispose() async {
     await _player.dispose();

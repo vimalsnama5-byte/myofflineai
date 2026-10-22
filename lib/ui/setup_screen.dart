@@ -90,8 +90,9 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Packet AI — one-time setup')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
           const Text(
             'Everything runs offline. Download one model for each part — '
@@ -121,6 +122,7 @@ class _SetupScreenState extends State<SetupScreen> {
             label: Text(_allReady ? 'Launch Packet AI' : 'Download all models to continue'),
           ),
         ],
+        ),
       ),
     );
   }

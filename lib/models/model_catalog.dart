@@ -106,7 +106,7 @@ const kSttModels = <ModelSpec>[
     kind: ModelKind.stt,
     id: 'whisper-tiny-en',
     name: 'Whisper Tiny (English)',
-    description: 'sherpa-onnx offline speech recognition.',
+    description: 'English only — fastest.',
     sizeBytes: 110000000,
     files: [
       ModelFileItem(
@@ -120,6 +120,27 @@ const kSttModels = <ModelSpec>[
       ModelFileItem(
         '$_hf/csukuangfj/sherpa-onnx-whisper-tiny.en/resolve/main/tiny.en-tokens.txt',
         'tiny.en-tokens.txt',
+      ),
+    ],
+  ),
+  ModelSpec(
+    kind: ModelKind.stt,
+    id: 'whisper-tiny-multi',
+    name: 'Whisper Tiny (Multilingual)',
+    description: 'Understands Tamil, English and 90+ languages.',
+    sizeBytes: 110000000,
+    files: [
+      ModelFileItem(
+        '$_hf/csukuangfj/sherpa-onnx-whisper-tiny/resolve/main/tiny-encoder.int8.onnx',
+        'tiny-encoder.int8.onnx',
+      ),
+      ModelFileItem(
+        '$_hf/csukuangfj/sherpa-onnx-whisper-tiny/resolve/main/tiny-decoder.int8.onnx',
+        'tiny-decoder.int8.onnx',
+      ),
+      ModelFileItem(
+        '$_hf/csukuangfj/sherpa-onnx-whisper-tiny/resolve/main/tiny-tokens.txt',
+        'tiny-tokens.txt',
       ),
     ],
   ),
@@ -144,6 +165,45 @@ const kTtsModels = <ModelSpec>[
       ModelFileItem(
         '$_hf/csukuangfj/vits-piper-en_US-lessac-low/resolve/main/tokens.txt',
         'tokens.txt',
+      ),
+    ],
+    hfRepo: 'csukuangfj/vits-piper-en_US-lessac-low',
+    hfIncludePrefix: 'espeak-ng-data/',
+  ),
+  ModelSpec(
+    kind: ModelKind.tts,
+    id: 'piper-ta-rasa-female',
+    name: 'Piper தமிழ் Rasa (female)',
+    description: 'Tamil voice. tokens.txt is generated at install.',
+    sizeBytes: 110000000,
+    files: [
+      ModelFileItem(
+        '$_hf/tinisoft/piper-ta_IN-rasa_female-medium/resolve/main/ta_IN-rasa_female-medium.onnx',
+        'ta_IN-rasa_female-medium.onnx',
+      ),
+      ModelFileItem(
+        '$_hf/tinisoft/piper-ta_IN-rasa_female-medium/resolve/main/ta_IN-rasa_female-medium.onnx.json',
+        'ta_IN-rasa_female-medium.onnx.json',
+      ),
+    ],
+    // espeak-ng-data is shared across Piper voices — reuse the same mirror.
+    hfRepo: 'csukuangfj/vits-piper-en_US-lessac-low',
+    hfIncludePrefix: 'espeak-ng-data/',
+  ),
+  ModelSpec(
+    kind: ModelKind.tts,
+    id: 'piper-ta-rasa-male',
+    name: 'Piper தமிழ் Rasa (male)',
+    description: 'Tamil voice. tokens.txt is generated at install.',
+    sizeBytes: 110000000,
+    files: [
+      ModelFileItem(
+        '$_hf/tinisoft/piper-ta_IN-rasa_male-medium/resolve/main/ta_IN-rasa_male-medium.onnx',
+        'ta_IN-rasa_male-medium.onnx',
+      ),
+      ModelFileItem(
+        '$_hf/tinisoft/piper-ta_IN-rasa_male-medium/resolve/main/ta_IN-rasa_male-medium.onnx.json',
+        'ta_IN-rasa_male-medium.onnx.json',
       ),
     ],
     hfRepo: 'csukuangfj/vits-piper-en_US-lessac-low',
@@ -177,6 +237,34 @@ const kAvatarModels = <ModelSpec>[
       ModelFileItem(
         'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/RobotExpressive/RobotExpressive.glb',
         'robot.glb',
+      ),
+    ],
+  ),
+  ModelSpec(
+    kind: ModelKind.avatar,
+    id: 'xbot',
+    name: 'Xbot (humanoid)',
+    description: 'Animated humanoid character.',
+    sizeBytes: 7500000,
+    fileName: 'xbot.glb',
+    files: [
+      ModelFileItem(
+        'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Xbot.glb',
+        'xbot.glb',
+      ),
+    ],
+  ),
+  ModelSpec(
+    kind: ModelKind.avatar,
+    id: 'michelle',
+    name: 'Michelle (humanoid)',
+    description: 'Animated human character, realistic look.',
+    sizeBytes: 5500000,
+    fileName: 'michelle.glb',
+    files: [
+      ModelFileItem(
+        'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Michelle.glb',
+        'michelle.glb',
       ),
     ],
   ),
