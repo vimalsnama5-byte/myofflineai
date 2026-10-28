@@ -110,6 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
           onViewerAvailable: (viewer) async {
             if (_avatarRequested) return;
             _avatarRequested = true;
+            // Wait for model init — keeps avatar native work out of the
+            // same window as the STT/TTS/LLM loads (crash isolation).
+            await _controller.initDone.future;
             final path = await _controller.avatarGlbPath();
             if (path != null) {
               await _controller.attachAvatar(viewer, path);

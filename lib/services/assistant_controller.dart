@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:thermion_flutter/thermion_flutter.dart' show ThermionViewer;
 
 import '../models/model_catalog.dart';
@@ -38,10 +39,18 @@ class AssistantController extends ChangeNotifier {
   double micLevel = 0;
 
   StreamSubscription<void>? _playbackSub;
+  File? _logFile;
+
+  /// Completes when init() finishes (success or error) — the avatar waits
+  /// on this so heavy native work never runs concurrently with model loads.
+  final initDone = Completer<void>();
 
   void log(String message) {
-    logs.add('${DateTime.now().toIso8601String().substring(11, 19)}  $message');
+    final line =
+        '${DateTime.now().toIso8601String().substring(11, 19)}  $message';
+    logs.add(line);
     if (logs.length > 200) logs.removeAt(0);
+    unawaited(_logFile?.writeAsString('$line\n', mode: FileMode.append));
   }
 
   void _fail(String phase, Object e, {AssistantState next = AssistantState.ready}) {
@@ -57,6 +66,10 @@ class AssistantController extends ChangeNotifier {
       await MemoryService.instance.init();
       _language = await MemoryService.instance.getPref('language') ?? 'en';
       await _restoreTranscript();
+      final docs = await getApplicationDocumentsDirectory();
+      _logFile = File('${docs.path}/packet_ai.log');
+      await File('${docs.path}/.init_in_progress').create(recursive: true);
+      log('init() started');
 
       for (final kind in ModelKind.values) {
         final spec = await ModelManager.instance.activeSpec(kind);
@@ -84,8 +97,15 @@ class AssistantController extends ChangeNotifier {
       state = AssistantState.ready;
       error = null;
       notifyListeners();
+      try {
+        final docs = await getApplicationDocumentsDirectory();
+        await File('${docs.path}/.init_in_progress').delete();
+        log('init() complete');
+      } catch (_) {}
     } catch (e) {
       _fail('Startup', e, next: AssistantState.error);
+    } finally {
+      if (!initDone.isCompleted) initDone.complete();
     }
   }
 

@@ -135,7 +135,7 @@ class TtsService {
       for (final entry in map.entries) {
         final ids = entry.value;
         final id = ids is List ? ids.first : ids;
-        buf.writeln('${entry.key} $id');
+        buf.writeln('${entry.key}\t$id');
       }
       final out = File('${modelDir.path}${Platform.pathSeparator}tokens.txt');
       await out.writeAsString(buf.toString());
