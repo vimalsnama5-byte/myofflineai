@@ -18,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _controller = AssistantController();
   final _scroll = ScrollController();
+  final _text = TextEditingController();
   bool _avatarRequested = false;
 
   @override
@@ -29,8 +30,16 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _scroll.dispose();
+    _text.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _send() {
+    final t = _text.text.trim();
+    if (t.isEmpty) return;
+    _text.clear();
+    unawaited(_controller.sendText(t));
   }
 
   void _scrollToBottom() {
@@ -68,15 +77,11 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(flex: 5, child: _avatarArea()),
               _statusBar(),
               Expanded(flex: 4, child: _transcript()),
+              _inputBar(),
             ],
           );
         },
       ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) => _micButton(),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
@@ -195,14 +200,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final items = _controller.transcript;
     if (items.isEmpty) {
       return const Center(
-        child: Text('Tap the mic and talk to me.',
+        child: Text('Type a message or tap the mic.',
             style: TextStyle(color: Colors.white38)),
       );
     }
     final partial = _controller.partialReply;
     return ListView.builder(
       controller: _scroll,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       itemCount: items.length + (partial != null ? 1 : 0),
       itemBuilder: (context, i) {
         final m = i < items.length
@@ -229,23 +234,66 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _micButton() {
+  /// Chat-first input bar: text field (primary) + mic (secondary).
+  Widget _inputBar() {
     final c = _controller;
     final busy = c.state == AssistantState.initializing ||
         c.state == AssistantState.thinking;
     final listening = c.state == AssistantState.listening;
-    return FloatingActionButton.large(
-      onPressed: busy ? null : () => unawaited(c.toggleMic()),
-      backgroundColor: listening
-          ? Colors.redAccent
-          : Theme.of(context).colorScheme.primary,
-      child: Icon(
-        listening
-            ? Icons.stop
-            : (c.state == AssistantState.speaking
-                ? Icons.stop
-                : Icons.mic),
-        size: 36,
+    final canSend = c.state == AssistantState.ready ||
+        c.state == AssistantState.error;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+        child: Row(
+          children: [
+            // Mic — secondary input, doubles as stop while speaking.
+            IconButton.filled(
+              onPressed: busy ? null : () => unawaited(c.toggleMic()),
+              style: IconButton.styleFrom(
+                backgroundColor: listening
+                    ? Colors.redAccent
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+              icon: Icon(
+                listening
+                    ? Icons.stop
+                    : (c.state == AssistantState.speaking
+                        ? Icons.stop
+                        : Icons.mic),
+                color: listening ? Colors.white : null,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _text,
+                enabled: canSend,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _send(),
+                decoration: InputDecoration(
+                  hintText: listening
+                      ? 'Listening…'
+                      : busy
+                          ? 'Thinking…'
+                          : 'Message Packet…',
+                  filled: true,
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              onPressed: canSend ? _send : null,
+              icon: const Icon(Icons.send),
+            ),
+          ],
+        ),
       ),
     );
   }

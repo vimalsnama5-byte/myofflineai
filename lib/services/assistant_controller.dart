@@ -65,6 +65,8 @@ class AssistantController extends ChangeNotifier {
     try {
       await MemoryService.instance.init();
       _language = await MemoryService.instance.getPref('language') ?? 'en';
+      voiceOutput =
+          (await MemoryService.instance.getPref('voiceOutput')) != '0';
       await _restoreTranscript();
       final docs = await getApplicationDocumentsDirectory();
       _logFile = File('${docs.path}/packet_ai.log');
@@ -93,7 +95,7 @@ class AssistantController extends ChangeNotifier {
       notifyListeners();
       await _loadLlm();
 
-      status = 'Ready — tap the mic';
+      status = 'Ready';
       state = AssistantState.ready;
       error = null;
       notifyListeners();
@@ -132,6 +134,15 @@ class AssistantController extends ChangeNotifier {
   String _language = 'en';
   String get language => _language;
 
+  /// When false, replies are text-only (no TTS/lip sync).
+  bool voiceOutput = true;
+
+  Future<void> setVoiceOutput(bool v) async {
+    voiceOutput = v;
+    await MemoryService.instance.setPref('voiceOutput', v ? '1' : '0');
+    notifyListeners();
+  }
+
   Future<void> _loadTts() async {
     log('Loading TTS');
     await tts.loadModel(await _installDirFor(ModelKind.tts));
@@ -168,6 +179,19 @@ class AssistantController extends ChangeNotifier {
     transcript
       ..clear()
       ..addAll(history.map((m) => TranscriptEntry(m.role, m.text)));
+  }
+
+  /// Text-input path — same assistant turn, just no microphone.
+  Future<void> sendText(String text) async {
+    final t = text.trim();
+    if (t.isEmpty) return;
+    if (state != AssistantState.ready && state != AssistantState.error) {
+      return;
+    }
+    state = AssistantState.thinking;
+    status = 'Thinking…';
+    notifyListeners();
+    await _runTurn(t);
   }
 
   /// Toggle listening on/off.
@@ -231,7 +255,7 @@ class AssistantController extends ChangeNotifier {
     await avatar.stopSpeaking();
     await stt.cancel();
     state = AssistantState.ready;
-    status = 'Ready — tap the mic';
+    status = 'Ready';
     notifyListeners();
   }
 
@@ -262,6 +286,13 @@ class AssistantController extends ChangeNotifier {
     transcript.add(TranscriptEntry('assistant', reply));
     await MemoryService.instance.addMessage('assistant', reply);
 
+    if (!voiceOutput) {
+      state = AssistantState.ready;
+      status = 'Ready';
+      notifyListeners();
+      return;
+    }
+
     status = 'Synthesizing voice…';
     state = AssistantState.speaking;
     notifyListeners();
@@ -275,7 +306,7 @@ class AssistantController extends ChangeNotifier {
     }
     if (speech == null) {
       state = AssistantState.ready;
-      status = 'Ready — tap the mic';
+      status = 'Ready';
       notifyListeners();
       return;
     }
@@ -288,7 +319,7 @@ class AssistantController extends ChangeNotifier {
     _playbackSub = tts.onComplete.listen((_) async {
       await avatar.stopSpeaking();
       state = AssistantState.ready;
-      status = 'Ready — tap the mic';
+      status = 'Ready';
       notifyListeners();
     });
     // Fallback in case onComplete never fires.
@@ -297,7 +328,7 @@ class AssistantController extends ChangeNotifier {
       if (state == AssistantState.speaking) {
         await avatar.stopSpeaking();
         state = AssistantState.ready;
-        status = 'Ready — tap the mic';
+        status = 'Ready';
         notifyListeners();
       }
     }));

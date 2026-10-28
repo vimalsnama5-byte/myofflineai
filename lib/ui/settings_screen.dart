@@ -86,6 +86,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             style: TextStyle(color: Colors.white54, fontSize: 12),
           ),
           const Divider(height: 32),
+          SwitchListTile(
+            title: const Text('Voice replies (TTS)'),
+            subtitle: const Text(
+                'Speak answers aloud — off for text-only replies'),
+            value: widget.controller.voiceOutput,
+            onChanged: (v) => widget.controller.setVoiceOutput(v),
+          ),
+          const Divider(height: 32),
           for (final kind in ModelKind.values) ...[
             Text(_kindLabel(kind),
                 style: const TextStyle(fontWeight: FontWeight.bold)),
