@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -24,6 +25,7 @@ class _SetupScreenState extends State<SetupScreen> {
   final Map<ModelKind, String> _picked = {};
   StreamSubscription? _sub;
   bool _busy = false;
+  bool _externalOk = true;
 
   @override
   void initState() {
@@ -31,7 +33,14 @@ class _SetupScreenState extends State<SetupScreen> {
     _refresh();
   }
 
+  Future<void> _checkStorage() async {
+    _externalOk = await ModelManager.canUseExternalStorage();
+    if (_externalOk) ModelManager.instance.invalidateRoot();
+    if (mounted) setState(() {});
+  }
+
   Future<void> _refresh() async {
+    _externalOk = await ModelManager.canUseExternalStorage();
     final sel = await ModelManager.instance.selection();
     for (final kind in ModelKind.values) {
       _picked[kind] = sel[kind] ?? specsFor(kind).first.id;
@@ -99,6 +108,32 @@ class _SetupScreenState extends State<SetupScreen> {
             'this only needs internet once.',
             style: TextStyle(color: Colors.white70),
           ),
+          if (!_externalOk)
+            Card(
+              color: Colors.deepPurple.shade900,
+              margin: const EdgeInsets.only(top: 12),
+              child: ListTile(
+                leading: const Icon(Icons.sd_card),
+                title: const Text('Keep models after reinstalls'),
+                subtitle: const Text(
+                    'Grant "All files access" so downloads survive '
+                    'app updates/uninstalls.'),
+                trailing: TextButton(
+                  onPressed: () async {
+                    const intent = AndroidIntent(
+                      action:
+                          'android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION',
+                      data: 'package:dev.packetai.packet_ai',
+                    );
+                    await intent.launch();
+                    // Re-check when the user returns from Settings.
+                    await Future.delayed(const Duration(seconds: 1));
+                    await _checkStorage();
+                  },
+                  child: const Text('Grant'),
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
           _kindSection(
             'AI brain (GGUF, llama.cpp)',

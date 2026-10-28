@@ -15,13 +15,68 @@ class ModelManager {
   ModelManager._();
   static final ModelManager instance = ModelManager._();
 
+  /// Public-storage models dir — survives app reinstalls once the user
+  /// grants "All files access" (MANAGE_EXTERNAL_STORAGE).
+  static const externalModelsPath = '/storage/emulated/0/PacketAI/models';
+
   Directory? _root;
 
   Future<Directory> get root async {
-    _root ??= Directory(
-      p.join((await getApplicationDocumentsDirectory()).path, 'models'),
-    );
+    _root ??= await _resolveRoot();
     return _root!;
+  }
+
+  /// Call when storage permission state may have changed — re-resolves
+  /// the models root on next access (migrates internal → external).
+  void invalidateRoot() => _root = null;
+
+  Future<Directory> _internalRoot() async => Directory(
+        p.join((await getApplicationDocumentsDirectory()).path, 'models'),
+      );
+
+  Future<Directory> _resolveRoot() async {
+    final ext = Directory(externalModelsPath);
+    if (await canUseExternalStorage()) {
+      final internal = await _internalRoot();
+      if (await internal.exists() && !await ext.exists()) {
+        try {
+          await _copyTree(internal, ext);
+          await internal.delete(recursive: true);
+        } catch (_) {
+          // Migration failed — keep using internal storage for now.
+          return internal;
+        }
+      }
+      return ext;
+    }
+    return _internalRoot();
+  }
+
+  /// Probes whether public storage is writable (i.e. All-files access is on).
+  static Future<bool> canUseExternalStorage() async {
+    try {
+      final dir = Directory('/storage/emulated/0/PacketAI');
+      await dir.create(recursive: true);
+      final probe = File('${dir.path}/.probe');
+      await probe.writeAsString('x');
+      await probe.delete();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _copyTree(Directory from, Directory to) async {
+    await for (final e in from.list(recursive: true, followLinks: false)) {
+      final rel = p.relative(e.path, from: from.path);
+      final dest = p.join(to.path, rel);
+      if (e is Directory) {
+        await Directory(dest).create(recursive: true);
+      } else if (e is File) {
+        await File(dest).parent.create(recursive: true);
+        await e.copy(dest);
+      }
+    }
   }
 
   Future<Directory> dirFor(ModelSpec spec) async =>

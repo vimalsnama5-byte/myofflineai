@@ -45,6 +45,7 @@ dependencies:
   http: ^1.6.0
   path: ^1.9.1
   vector_math: ^2.4.3
+  android_intent_plus: ^6.1.0
 
 dev_dependencies:
   flutter_test:
